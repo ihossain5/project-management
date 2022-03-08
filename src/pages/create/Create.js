@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
 import Select from 'react-select'
 import useCollection from '../../hooks/useCollection'
+import { timestamp } from '../../firebase/config'
 
 // styles
 import './Create.css'
+import useAuthContext from '../../hooks/useAuthContext'
+import useFireStore from '../../hooks/useFireStore'
+import { useNavigate } from 'react-router-dom'
 
 const categories = [
   { value: 'development', label: 'Development' },
@@ -13,6 +17,9 @@ const categories = [
 ]
 
 const Create = () => {
+  const navigate = useNavigate()
+  const { addDocument, response } = useFireStore('projects')
+  const { user } = useAuthContext()
   const { documents } = useCollection('users')
   const [users, setUsers] = useState([])
 
@@ -35,8 +42,43 @@ const Create = () => {
   
     const handleSubmit = async (e) => {
       e.preventDefault()
+
+      if (!category) {
+        setFormError('Please select a project category.')
+        return
+      }
+      if (assignedUsers.length < 1) {
+        setFormError('Please assign the project to at least 1 user')
+        return
+      }
   
-      console.log(name, details, dueDate, category.value, assignedUsers)
+      const assignedUsersList = assignedUsers.map(u => {
+        return { 
+          displayName: u.value.displayName, 
+          photoURL: u.value.photoURL,
+          id: u.value.id
+        }
+      })
+      const createdBy = { 
+        displayName: user.displayName, 
+        photoURL: user.photoURL,
+        id: user.uid
+      }
+  
+      const project = {
+        name,
+        details,
+        category: category.value,
+        dueDate: timestamp.fromDate(new Date(dueDate)),
+        assignedUsersList, 
+        createdBy,
+        comments: []
+      }
+  
+      await addDocument(project)
+      if (!response.error) {
+        navigate('/')
+      }
     }
   return (
     <div className="create-form">
@@ -86,6 +128,7 @@ const Create = () => {
       </label>
 
       <button className="btn">Add Project</button>
+      {formError && (<p className='error'>{formError}</p>)}
     </form>
   </div>
   )
